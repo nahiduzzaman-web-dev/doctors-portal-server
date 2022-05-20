@@ -6,6 +6,10 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 5000
 
+
+var nodemailer = require('nodemailer');
+var sgTransport = require('nodemailer-sendgrid-transport');
+
 app.use(cors());
 app.use(express.json());
 
@@ -29,6 +33,52 @@ function verifyJWT(req, res, next) {
         next();
     })
 }
+
+const emailSenderOptions = {
+    auth: {
+        api_key: process.env.EMAIL_SENDER_KEY
+    }
+}
+
+const emailClient = nodemailer.createTransport(sgTransport(emailSenderOptions));
+
+
+function sendAppointmentEmail(booking) {
+    const { patient, patientName, treatment, date, slot } = booking;
+
+    var email = {
+        from: process.env.EMAIL_SENDER,
+        to: patient,
+        subject: `Your Appointment for ${treatment} is on ${date} at ${slot} is Confirmed`,
+        text: `Your Appointment for ${treatment} is on ${date} at ${slot} is Confirmed`,
+        html: `
+        <div>
+          <p> Hello ${patientName}, </p>
+          <h3>Your Appointment for ${treatment} is confirmed</h3>
+          <p>Looking forward to seeing you on ${date} at ${slot}.</p>
+          
+          <h3>Our Address</h3>
+          <p>House 2/1 (1st floor), </p>
+          <p> Road 2, Block C, Section 2, Mirpur,</p>
+          <p>Dhaka, Bangladesh</p>
+          <p>Bangladesh</p>
+          <a href="https://crewbd.net/">unsubscribe</a>
+        </div>
+      `
+    };
+
+    emailClient.sendMail(email, function (err, info) {
+        if (err) {
+            console.log(err);
+        }
+        else {
+            console.log('Message sent: ', info);
+        }
+    });
+
+}
+
+
 
 async function run() {
     try {
@@ -148,6 +198,7 @@ async function run() {
                 return res.send({ success: false, booking: exists })
             }
             const result = await bookingCollection.insertOne(booking);
+            sendAppointmentEmail(booking);
             return res.send({ success: true, result });
         });
 
